@@ -3,11 +3,29 @@ from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
 from datetime import datetime
 from airflow.models import Variable
+import logging
 
+# # Configurer le logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# # Créer un gestionnaire de console et définir le niveau de log
+# console_handler = logging.StreamHandler()
+# console_handler.setLevel(logging.INFO)
+
+# # Créer un formatteur et l'ajouter au gestionnaire
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# console_handler.setFormatter(formatter)
+
+# # Ajouter le gestionnaire au logger
+# logger.addHandler(console_handler)
+
+def send_log(message):
+    logger.info(message)
 
 def create_table():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
-
+    send_log("Début création des tables")
     create_table_queries = [
         """
         CREATE TABLE IF NOT EXISTS holidays_1 (
@@ -38,7 +56,8 @@ def create_table():
     for query in create_table_queries:
         postgres_hook.run(query)
         print(f"Executed query: {query}")
-
+        send_log("table crée")
+    send_log("Fin de la création des tables")
 
 # Définiton du dag
 dag = DAG(
