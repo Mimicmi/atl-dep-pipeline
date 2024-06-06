@@ -1,0 +1,4 @@
+holidays==0.50
+python-dateutil==2.9.0.post0
+six==1.16.0
+vacances-scolaires-france==0.10.0
