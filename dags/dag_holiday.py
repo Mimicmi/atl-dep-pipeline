@@ -74,7 +74,7 @@ def insert_temperature():
     conn.close()
 
 
-def insert_profile():
+def insert_coefficient_profile():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
 
     response_profil = requests.get(
@@ -123,4 +123,16 @@ holiday = PythonOperator(
     dag=dag
 )
 
-holiday
+temperature = PythonOperator(
+    task_id='temperature',
+    python_callable=insert_temperature,
+    dag=dag
+)
+
+coefficient_profil = PythonOperator(
+    task_id='coefficient_profil',
+    python_callable=insert_coefficient_profile,
+    dag=dag
+)
+
+holiday >> temperature >> coefficient_profil
