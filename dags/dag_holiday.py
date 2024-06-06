@@ -112,26 +112,6 @@ def insert_coefficient_profile():
     conn.close()
 
 
-def fetch_all_data():
-    start_date = str((datetime.today() - timedelta(days=60)).date())
-    end_date = str(datetime.today().date())
-    base_url = f"https://data.enedis.fr/api/explore/v2.1/catalog/datasets/coefficients-d"
-    all_data = []
-    offset = 0
-    limit = 100
-    while True:
-        response = requests.get(
-            base_url, params={"limit": limit, "offset": offset})
-        data = response.json()
-        print(data)
-        records = data["results"]
-        all_data.extend(records)
-        if len(records) < limit:
-            break
-        offset += limit
-    return pd.DataFrame(all_data)
-
-
 dag = DAG(
     'holiday',
     start_date=datetime(2024, 6, 6),
