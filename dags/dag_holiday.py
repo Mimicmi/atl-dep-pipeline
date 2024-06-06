@@ -1,7 +1,7 @@
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
-from datetime import datetime
+from datetime import datetime, timedelta
 from airflow.models import Variable
 import pandas as pd
 from vacances_scolaires_france import SchoolHolidayDates
@@ -110,6 +110,26 @@ def insert_coefficient_profile():
     conn.commit()
     cursor.close()
     conn.close()
+
+
+def fetch_all_data():
+    start_date = str((datetime.today() - timedelta(days=60)).date())
+    end_date = str(datetime.today().date())
+    base_url = f"https://data.enedis.fr/api/explore/v2.1/catalog/datasets/coefficients-d"
+    all_data = []
+    offset = 0
+    limit = 100
+    while True:
+        response = requests.get(
+            base_url, params={"limit": limit, "offset": offset})
+        data = response.json()
+        print(data)
+        records = data["results"]
+        all_data.extend(records)
+        if len(records) < limit:
+            break
+        offset += limit
+    return pd.DataFrame(all_data)
 
 
 dag = DAG(
