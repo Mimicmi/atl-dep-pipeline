@@ -67,7 +67,7 @@ def insert_temperature():
 
     for index, row in df_temp.iterrows():
         cursor.execute("INSERT INTO temperatures_1 (timestamp, trl, tnl) VALUES (%s,%s,%s)",
-                       row['timestamp'], row['trl'], row['tnl'])
+                       (row['timestamp'], row['trl'], row['tnl']))
 
     conn.commit()
     cursor.close()
@@ -105,7 +105,7 @@ def insert_coefficient_profile():
 
     for index, row in df_profil.iterrows():
         cursor.execute("INSERT INTO profil_coefficients_1 (timestamp, sous_profil, cp) VALUES (%s,%s,%s)",
-                       row['timestamp'], row['sous_profil'], row['cp'])
+                       (row['timestamp'], row['sous_profil'], row['cp']))
 
     conn.commit()
     cursor.close()
