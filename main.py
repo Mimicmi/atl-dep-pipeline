@@ -2,6 +2,9 @@ import requests
 import json
 from pprint import pprint as pp
 import pandas as pd
+from vacances_scolaires_france import SchoolHolidayDates
+import datetime
+
 
 # Config url appel api
 response_profil = requests.get(
@@ -53,5 +56,17 @@ df_temp = pd.DataFrame({
 
 df_profil["sous_profil"] = df_profil["sous_profil"].astype(str)
 
-print(df_profil.dtypes)
-print(df_temp.dtypes)
+d = SchoolHolidayDates()
+
+france_holidays_2023 = d.holidays_for_year(2023)
+
+# Convertir le dictionnaire en liste de dictionnaires
+list_holidays = [value for key, value in france_holidays_2023.items()]
+
+# Créer le DataFrame
+df_holidays = pd.DataFrame(list_holidays)
+
+# Ajouter une colonne 'is_public_holiday' avec des valeurs par défaut (par exemple, False)
+df_holidays['is_public_holiday'] = False
+
+print(df_holidays)
