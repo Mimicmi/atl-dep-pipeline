@@ -41,7 +41,7 @@ for record in records_temp:
 # création du dataframe avec les bonnes données et les titres de colonne
 df_profil = pd.DataFrame({
     "timestamp": pd.to_datetime(timestamps_profil),
-    "sous_profil": pd.to_string(sous_profil),
+    "sous_profil": sous_profil,
     "cp": pd.to_numeric(cp)
 })
 
@@ -51,5 +51,7 @@ df_temp = pd.DataFrame({
     "tnl": pd.to_numeric(tnl)
 })
 
-print(df_profil)
-print(df_temp)
+df_profil["sous_profil"] = df_profil["sous_profil"].astype(str)
+
+print(df_profil.dtypes)
+print(df_temp.dtypes)
