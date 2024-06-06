@@ -61,13 +61,12 @@ d = SchoolHolidayDates()
 france_holidays_2023 = d.holidays_for_year(2023)
 
 # Convertir le dictionnaire en liste de dictionnaires
-list_of_dicts = [value for key, value in france_holidays_2023.items()]
+list_holidays = [value for key, value in france_holidays_2023.items()]
 
 # Créer le DataFrame
-df_holidays = pd.DataFrame(list_of_dicts)
+df_holidays = pd.DataFrame(list_holidays)
 
 # Ajouter une colonne 'is_public_holiday' avec des valeurs par défaut (par exemple, False)
 df_holidays['is_public_holiday'] = False
 
-# Afficher le DataFrame
 print(df_holidays)
