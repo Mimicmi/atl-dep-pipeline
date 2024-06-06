@@ -11,25 +11,25 @@ def create_table():
     create_table_queries = [
         """
         CREATE TABLE IF NOT EXISTS holidays_1 (
-            date datetime,
-            vacances_zone_a BOOLEAN NOT NULL,
-            vacances_zone_b BOOLEAN NOT NULL,
-            vacances_zone_c BOOLEAN NOT NULL,
-            nom_vacances string NOT NULL,
-            is_public_holiday BOOLEAN NOT NULL
+            date TIMESTAMP,
+            vacances_zone_a BOOLEAN ,
+            vacances_zone_b BOOLEAN ,
+            vacances_zone_c BOOLEAN ,
+            nom_vacances VARCHAR(255) ,
+            is_public_holiday BOOLEAN 
         );
         """,
         """
         CREATE TABLE IF NOT EXISTS temperatures_1 (
-            timestamp datetime,
+            timestamp TIMESTAMP,
             trl FLOAT,
             tnl FLOAT
         );
         """,
         """
         CREATE TABLE IF NOT EXISTS profil_coefficients_1 (
-            timestamp datetime,
-            sous_profil string NOT NULL,
+            timestamp TIMESTAMP,
+            sous_profil VARCHAR(255) ,
             cp FLOAT
         );
         """
