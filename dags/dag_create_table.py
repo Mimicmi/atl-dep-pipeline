@@ -7,7 +7,7 @@ from airflow.models import Variable
 
 def create_table():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
-    
+
     create_table_queries = [
         """
         CREATE TABLE IF NOT EXISTS holidays_1 (
@@ -38,6 +38,7 @@ def create_table():
     for query in create_table_queries:
         postgres_hook.run(query)
         print(f"Executed query: {query}")
+
 
 # Définiton du dag
 dag = DAG(
