@@ -220,42 +220,67 @@ def dag_success_alert(context):
 def dag_failure_alert(context):
     print(f"Dag has failed its execution, run_id: {context['run_id']}")
 
-def check_condition():
+def check_condition(**kwargs):
     # Simulate user input or some condition
-    # user_input = "true"  # This should be dynamically set based on actual user input or other conditions
+    user_input = kwargs['dag_run'].conf.get('effacer_bdd')
+    send_log(user_input)
     if user_input.lower() == "true":
-        return "true_branch"
+        return "effacer_bdd"
     else:
         return "false_branch"
     
 def task_to_run():
-    return "Task executed because the user input was true."
+    postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
+
+    send_log("Début de suppression des tables")
+
+    delete_table_queries = [
+        """
+        TRUNCATE TABLE  holidays_1;
+        """,
+        """
+        TRUNCATE TABLE  temperatures_1;
+        """,
+        """
+        TRUNCATE TABLE  profil_coefficients_1;
+        """,
+        """
+        TRUNCATE TABLE  data_model_inputs_1;
+        """,
+        """
+        DROP TABLE  holidays_1;
+        """,
+        """
+        DROP TABLE  temperatures_1;
+        """,
+        """
+        DROP TABLE  profil_coefficients_1;
+        """,
+        """
+        DROP TABLE  data_model_inputs_1;
+        """
+    ]
+
+    for query in delete_table_queries:
+        postgres_hook.run(query)
+        print(f"Executed query: {query}")
+
+    send_log("Fin de la suppression des tables")
+
 
 dag = DAG(
     'creation_bdd',
     start_date=datetime(2024, 6, 6),
     schedule_interval='0 8 * * *',
     on_success_callback=dag_success_alert,
-    on_failure_callback=dag_failure_alert
+    on_failure_callback=dag_failure_alert,
+    params={"effacer_bdd":"false"},
 )
 
 tables_base = PythonOperator(
     task_id='create_table',
     python_callable=create_table,
     dag=dag
-)
-
-dag2 = DAG(
-    'conditional_task_dag',
-    default_args=default_args,
-    description='A DAG with a conditional task based on user input',
-    schedule_interval=timedelta(days=1),
-)
-
-check_condition_task = BranchPythonOperator(
-    task_id='check_condition',
-    python_callable=check_condition,
-    dag=dag2,
 )
 
 holiday = PythonOperator(
@@ -282,30 +307,22 @@ coefficient_profil = PythonOperator(
     dag=dag
 )
 
-tables_base >> [holiday, temperature, coefficient_profil] >> table_models
-
 check_condition_task = BranchPythonOperator(
     task_id='check_condition',
     python_callable=check_condition,
-    dag=dag2,
+    dag=dag,
 )
 
 true_branch_task = PythonOperator(
-    task_id='true_branch',
+    task_id='effacer_bdd',
     python_callable=task_to_run,
-    dag=dag2,
+    dag=dag,
 )
 
 false_branch_task = DummyOperator(
     task_id='false_branch',
-    dag=dag2,
-)
-
-end_task = DummyOperator(
-    task_id='end',
-    dag=dag2,
+    dag=dag,
 )
 
 check_condition_task >> [true_branch_task, false_branch_task]
-true_branch_task >> end_task
-false_branch_task >> end_task
+true_branch_task >> tables_base >> [holiday, temperature, coefficient_profil] >> table_models
