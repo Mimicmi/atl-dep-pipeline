@@ -33,10 +33,10 @@ def create_table():
         """
         CREATE TABLE IF NOT EXISTS holidays_1 (
             date TIMESTAMP,
-            vacances_zone_a BOOLEAN ,
-            vacances_zone_b BOOLEAN ,
-            vacances_zone_c BOOLEAN ,
-            nom_vacances VARCHAR(255) ,
+            vacances_zone_a BOOLEAN,
+            vacances_zone_b BOOLEAN,
+            vacances_zone_c BOOLEAN,
+            nom_vacances VARCHAR(255),
             is_public_holiday BOOLEAN 
         );
         """,
@@ -326,34 +326,53 @@ def task_to_run():
 
     send_log("Début de suppression des tables")
 
-    delete_table_queries = [
+    truncate_table_queries = [
         """
-        TRUNCATE TABLE  holidays_1;
+        DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'holidays_1') THEN
+            TRUNCATE TABLE holidays_1;
+        END IF;
+        END $$;
         """,
         """
-        TRUNCATE TABLE  temperatures_1;
+        DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'temperatures_1') THEN
+            TRUNCATE TABLE temperatures_1;
+        END IF;
+        END $$;
         """,
         """
-        TRUNCATE TABLE  profil_coefficients_1;
+        DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profil_coefficients_1') THEN
+            TRUNCATE TABLE profil_coefficients_1;
+        END IF;
+        END $$;
         """,
         """
-        TRUNCATE TABLE  data_model_inputs_1;
-        """,
-        """
-        DROP TABLE  holidays_1;
-        """,
-        """
-        DROP TABLE  temperatures_1;
-        """,
-        """
-        DROP TABLE  profil_coefficients_1;
-        """,
-        """
-        DROP TABLE  data_model_inputs_1;
+        DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'data_model_inputs_1') THEN
+            TRUNCATE TABLE data_model_inputs_1;
+        END IF;
+        END $$;
         """
     ]
 
-    for query in delete_table_queries:
+    drop_table_queries = [
+        """
+        DROP TABLE IF EXISTS holidays_1;
+        """,
+        """
+        DROP TABLE IF EXISTS temperatures_1;
+        """,
+        """
+        DROP TABLE IF EXISTS profil_coefficients_1;
+        """,
+        """
+        DROP TABLE IF EXISTS data_model_inputs_1;
+        """
+    ]
+
+    for query in truncate_table_queries + drop_table_queries:
         postgres_hook.run(query)
         print(f"Executed query: {query}")
 
