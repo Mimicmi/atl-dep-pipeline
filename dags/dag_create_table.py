@@ -83,10 +83,10 @@ def table_models_input():
             tnl FLOAT,
             sous_profil VARCHAR(255) ,
             cp FLOAT,
-            day_of_week integer(1),
-            day_of_year integer(2),
-            half_hour integer(2),
-            fr_holiday integer(3),
+            day_of_week INTEGER,
+            day_of_year INTEGER,
+            half_hour INTEGER,
+            fr_holiday VARCHAR(3),
             is_public_holiday boolean
         );
         """
@@ -103,6 +103,7 @@ def insert_holiday():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
 
     d = SchoolHolidayDates()
+
     france_holidays_2023 = d.holidays_for_year(2023)
     send_log("Récupération des données API vacances ok")
 
@@ -120,13 +121,11 @@ def insert_holiday():
     # Connexion à la base de données et exécution de la requête
     conn = postgres_hook.get_conn()
     cursor = conn.cursor()
-    send_log("Connexion à la bdd ok")
 
     send_log("Debut insertion des données de vacances")
     for index, row in df_holidays.iterrows():
         cursor.execute("INSERT INTO holidays_1 (date, vacances_zone_a, vacances_zone_b, vacances_zone_c, nom_vacances, is_public_holiday) VALUES (%s,%s,%s,%s,%s,%s)",
                        (row['date'], row['vacances_zone_a'], row['vacances_zone_b'], row['vacances_zone_c'], row['nom_vacances'], row['is_public_holiday']))
-    send_log("insertion de "+index+" ligne(s)")
 
     conn.commit()
     cursor.close()
@@ -138,9 +137,9 @@ def insert_temperature():
 
     response_temp = requests.get(
         "https://data.enedis.fr//api/explore/v2.1/catalog/datasets/donnees-de-temperature-et-de-pseudo-rayonnement/records")
-    send_log("Récupération des données API temperature ok")
 
     response_temp = response_temp.json()
+    send_log("Récupération des données API temperature ok")
 
     records_temp = response_temp["results"]
 
@@ -159,17 +158,14 @@ def insert_temperature():
         "trl": pd.to_numeric(trl),
         "tnl": pd.to_numeric(tnl)
     })
-    send_log("Dataframe ready")
 
     conn = postgres_hook.get_conn()
     cursor = conn.cursor()
-    send_log("Connexion à la bdd ok")
 
-    send_log("Debut insertion des données de temperature")
+    send_log("Debut insertion des données de températures")
     for index, row in df_temp.iterrows():
         cursor.execute("INSERT INTO temperatures_1 (timestamp, trl, tnl) VALUES (%s,%s,%s)",
                        (row['timestamp'], row['trl'], row['tnl']))
-    send_log("insertion de "+(index+1)+" ligne(s)")
 
     conn.commit()
     cursor.close()
@@ -181,9 +177,10 @@ def insert_coefficient_profile():
 
     response_profil = requests.get(
         "https://data.enedis.fr/api/explore/v2.1/catalog/datasets/coefficients-des-profils/records")
+
     response_profil = response_profil.json()
     records_profil = response_profil["results"]
-    send_log("Récupération des données API profil ok")
+    send_log("Récupération des données API coefficient profil ok")
 
     timestamps_profil = []
     sous_profil = []
@@ -191,7 +188,7 @@ def insert_coefficient_profile():
 
     conn = postgres_hook.get_conn()
     cursor = conn.cursor()
-    send_log("Création du Dataframe profil")
+
     for record in records_profil:
         timestamps_profil.append(record["horodate"])
         sous_profil.append(record["sous_profil"])
@@ -202,15 +199,13 @@ def insert_coefficient_profile():
         "sous_profil": sous_profil,
         "cp": pd.to_numeric(cp)
     })
-    send_log("Dataframe ready")
 
     df_profil["sous_profil"] = df_profil["sous_profil"].astype(str)
 
-    send_log("Debut insertion des données de temperature")
+    send_log("Debut insertion des données de coefficient profil")
     for index, row in df_profil.iterrows():
         cursor.execute("INSERT INTO profil_coefficients_1 (timestamp, sous_profil, cp) VALUES (%s,%s,%s)",
                        (row['timestamp'], row['sous_profil'], row['cp']))
-    send_log("insertion de "+(index+1)+" ligne(s)")
 
     conn.commit()
     cursor.close()
@@ -234,8 +229,8 @@ dag = DAG(
 )
 
 tables_base = PythonOperator(
-    task_id='coefficient_profil',
-    python_callable=table_models_input,
+    task_id='create_table',
+    python_callable=create_table,
     dag=dag
 )
 
