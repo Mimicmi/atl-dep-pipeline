@@ -2,7 +2,7 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
 from airflow.utils.dates import days_ago
-from datetime import datetime
+from datetime import datetime, timedelta
 from airflow.models import Variable
 import logging
 import pandas as pd
@@ -193,41 +193,78 @@ def insert_holiday():
     conn.close()
 
 
-def insert_temperature():
-    postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
+def fetch_all_data(url):
+    start_date = str((datetime.today() - timedelta(days=8)).date())
+    end_date = str((datetime.today() - timedelta(days=1)).date())
+    base_url = f"{url}?where=horodate%20%3E%20'{start_date}'%20and%20horodate%20%3C%20'{end_date}'"
 
-    response_temp = requests.get(
-        "https://data.enedis.fr//api/explore/v2.1/catalog/datasets/donnees-de-temperature-et-de-pseudo-rayonnement/records")
+    all_data = []
+    offset = 0
+    limit = 100  # Adjust as per API's limit parameter
 
-    response_temp = response_temp.json()
-    send_log("Récupération des données API temperature ok")
+    while True:
+        response = requests.get(
+            base_url, params={"limit": limit, "offset": offset})
+        data = response.json()
+        print(data)
+        records = data["results"]
+        all_data.extend(records)
 
-    records_temp = response_temp["results"]
+        if len(records) < limit:
+            break
 
-    timestamps_temp = []
-    trl = []
-    tnl = []
+        offset += limit
 
-    for record in records_temp:
-        timestamps_temp.append(record["horodate"])
-        trl.append(record["temperature_realisee_lissee_degc"])
-        tnl.append(record["temperature_normale_lissee_degc"])
+    return pd.DataFrame(all_data)
 
-    send_log("Création du Dataframe temperature")
-    df_temp = pd.DataFrame({
-        "timestamp": pd.to_datetime(timestamps_temp),
-        "trl": pd.to_numeric(trl),
-        "tnl": pd.to_numeric(tnl)
-    })
 
-    conn = postgres_hook.get_conn()
+def insert_temperature(**kwargs):
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.DEBUG)
+
+    # Connexion à la base de données
+    hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
+    conn = hook.get_conn()
     cursor = conn.cursor()
 
-    send_log("Debut insertion des données de températures")
-    for index, row in df_temp.iterrows():
-        cursor.execute("INSERT INTO temperatures_1 (timestamp, trl, tnl) VALUES (%s,%s,%s)",
-                       (row['timestamp'], row['trl'], row['tnl']))
+    # Vérifier si la table existe, sinon la créer
+    cursor.execute("""
+         CREATE TABLE IF NOT EXISTS temperatures_1 (
+            timestamp TIMESTAMP,
+            trl FLOAT,
+            tnl FLOAT
+        );
+    """)
+    conn.commit()
 
+    # Vérifier si la table est vide
+    cursor.execute("SELECT COUNT(*) FROM temperatures_1;")
+    table_count = cursor.fetchone()[0]
+
+    df = fetch_all_data(
+        'https://data.enedis.fr//api/explore/v2.1/catalog/datasets/donnees-de-temperature-et-de-pseudo-rayonnement/records')
+
+    # logging.info(type(df['timestamp']))
+
+    if table_count == 0:  # Si la table est vide, récupérer toutes les données depuis 01-01-2023
+        for index, row in df.iterrows():
+            cursor.execute(""" INSERT INTO temperatures_1 (timestamp, trl, tnl) VALUES (%s, %s,%s)""",
+                           (row['horodate'], row['temperature_realisee_lissee_degc'], row['temperature_normale_lissee_degc']))
+
+    else:  # Si la table n'est pas vide, récupérer le dernier timestamp
+        cursor.execute("""
+            SELECT MAX(timestamp) FROM temperatures_1;
+        """)
+        last_timestamp = cursor.fetchone()[0]
+        if last_timestamp < (datetime.today() - timedelta(days=8)).date():
+            for index, row in df.iterrows():
+                cursor.execute("""
+                    INSERT INTO temperatures (timestamp, trl, tnl)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (timestamp)
+                    DO UPDATE SET
+                        trl = EXCLUDED.trl,
+                        tnl = EXCLUDED.tnl;""", (row['horodate'], row['temperature_realisee_lissee_degc'], row['temperature_normale_lissee_degc']))
     conn.commit()
     cursor.close()
     conn.close()
@@ -360,6 +397,7 @@ insert_data_task = PythonOperator(
     python_callable=insert_transformed_data,
     dag=dag,
 )
+
 
 tables_base >> [holiday, temperature,
                 coefficient_profil] >> table_models >> insert_data_task >> send_succes_mail
