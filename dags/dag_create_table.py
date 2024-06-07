@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
+from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
 from datetime import datetime
 from airflow.models import Variable
@@ -7,6 +7,7 @@ import logging
 import pandas as pd
 from vacances_scolaires_france import SchoolHolidayDates
 import requests
+from airflow.operators.dummy import DummyOperator
 
 # # Configurer le logger
 logger = logging.getLogger(__name__)
@@ -219,11 +220,21 @@ def dag_success_alert(context):
 def dag_failure_alert(context):
     print(f"Dag has failed its execution, run_id: {context['run_id']}")
 
+def check_condition():
+    # Simulate user input or some condition
+    # user_input = "true"  # This should be dynamically set based on actual user input or other conditions
+    if user_input.lower() == "true":
+        return "true_branch"
+    else:
+        return "false_branch"
+    
+def task_to_run():
+    return "Task executed because the user input was true."
 
 dag = DAG(
     'creation_bdd',
     start_date=datetime(2024, 6, 6),
-    schedule_interval='@daily',
+    schedule_interval='0 8 * * *',
     on_success_callback=dag_success_alert,
     on_failure_callback=dag_failure_alert
 )
@@ -232,6 +243,19 @@ tables_base = PythonOperator(
     task_id='create_table',
     python_callable=create_table,
     dag=dag
+)
+
+dag2 = DAG(
+    'conditional_task_dag',
+    default_args=default_args,
+    description='A DAG with a conditional task based on user input',
+    schedule_interval=timedelta(days=1),
+)
+
+check_condition_task = BranchPythonOperator(
+    task_id='check_condition',
+    python_callable=check_condition,
+    dag=dag2,
 )
 
 holiday = PythonOperator(
@@ -259,3 +283,29 @@ coefficient_profil = PythonOperator(
 )
 
 tables_base >> [holiday, temperature, coefficient_profil] >> table_models
+
+check_condition_task = BranchPythonOperator(
+    task_id='check_condition',
+    python_callable=check_condition,
+    dag=dag2,
+)
+
+true_branch_task = PythonOperator(
+    task_id='true_branch',
+    python_callable=task_to_run,
+    dag=dag2,
+)
+
+false_branch_task = DummyOperator(
+    task_id='false_branch',
+    dag=dag2,
+)
+
+end_task = DummyOperator(
+    task_id='end',
+    dag=dag2,
+)
+
+check_condition_task >> [true_branch_task, false_branch_task]
+true_branch_task >> end_task
+false_branch_task >> end_task
