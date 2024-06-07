@@ -212,20 +212,28 @@ def insert_coefficient_profile():
     conn.close()
 
 
-def dag_success_alert(context):
-    print(f"DAG has succeeded, run_id: {context['run_id']}")
+def dag_success_alert():
+    print("------------")
+    print("ON_SUCCESS_CALLBACK CALLED")
+    print(f"DAG has succeeded")
+    print("------------")
 
 
-def dag_failure_alert(context):
-    print(f"Dag has failed its execution, run_id: {context['run_id']}")
+def dag_failure_alert():
+    print("------------")
+    print("ON_FAILURE_CALLBACK CALLED")
+    print(f"Dag has failed its execution")
+    print("------------")
 
 
 dag = DAG(
     'creation_bdd',
     start_date=datetime(2024, 6, 6),
     schedule_interval='@daily',
-    on_success_callback=dag_success_alert,
-    on_failure_callback=dag_failure_alert
+    default_args={
+        'on_success_callback': dag_success_alert,
+        'on_failure_callback': dag_failure_alert
+    }
 )
 
 tables_base = PythonOperator(
