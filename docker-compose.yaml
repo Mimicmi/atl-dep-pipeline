@@ -64,7 +64,7 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
-    AIRFLOW_CONN_POSTGRES_CONNEXION: postgresql+psycopg2://postgres:postgres@rio.local:5432/ds_predictions
+    AIRFLOW_CONN_POSTGRES_CONNEXION: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
@@ -94,6 +94,8 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+    ports: 
+      - "5433:5432"
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
