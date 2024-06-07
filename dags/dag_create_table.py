@@ -1,12 +1,18 @@
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
+from airflow.utils.dates import days_ago
 from datetime import datetime
 from airflow.models import Variable
 import logging
 import pandas as pd
 from vacances_scolaires_france import SchoolHolidayDates
 import requests
+from airflow.utils.email import send_email
+from email.message import EmailMessage
+import smtplib
+from airflow.decorators import task
+
 
 # # Configurer le logger
 logger = logging.getLogger(__name__)
@@ -267,28 +273,56 @@ def insert_coefficient_profile():
     conn.close()
 
 
-def dag_success_alert():
-    print("------------")
-    print("ON_SUCCESS_CALLBACK CALLED")
-    print(f"DAG has succeeded")
-    print("------------")
+def send_success_email():
+    """
+    Fonction pour envoyer un e-mail une fois que le DAG a été exécuté avec succès.
+    """
+    subject = "Succès : Votre DAG a été exécuté avec succès"
+    body = "Bonjour,\n\nVotre DAG a été exécuté avec succès. Bravo !\n\nCordialement,\nVotre équipe Airflow"
+    send_email(to=['jicoga1678@fna6.com'],
+               subject=subject, html_content=body)
 
 
-def dag_failure_alert():
-    print("------------")
-    print("ON_FAILURE_CALLBACK CALLED")
-    print(f"Dag has failed its execution")
-    print("------------")
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'schedule_interval': 'None',
+    'start_date': datetime(2024, 3, 17),
+    'email_on_failure': False,
+    'email_on_success': True,
+    'email_on_retry': False,
+    'email_on_retry': False,
+    'retries': 1
+}
 
+
+@task(task_id="envoi_mail")
+def send_mail(subject, content):
+    # Configuration de l'envoi de mail
+    gmail_cfg = {
+        "server": "smtp.gmail.com",
+        "port": "465",
+        "email": "",  # TODO: METTEZ VOTRE ADRESSE EMAIL
+        "pwd": ""  # TODO: METTEZ VOTRE MOT DE PASSE D'APPLICATION SI SMTP GMAIL
+    }
+
+    msg = EmailMessage()
+    msg["to"] = gmail_cfg["email"]
+    msg["from"] = gmail_cfg["email"]
+    msg["Subject"] = subject
+    msg.set_content(content)
+
+    with smtplib.SMTP_SSL(gmail_cfg["server"], int(gmail_cfg["port"])) as smtp:
+        smtp.login(gmail_cfg["email"], gmail_cfg["pwd"])
+        smtp.send_message(msg)
+
+
+send_succes_mail = send_mail("Airflow DAG", "Execution avec succès")
 
 dag = DAG(
     'creation_bdd',
     start_date=datetime(2024, 6, 6),
     schedule_interval='0 8 * * *',
-    default_args={
-        'on_success_callback': dag_success_alert,
-        'on_failure_callback': dag_failure_alert
-    }
 )
 
 tables_base = PythonOperator(
@@ -328,4 +362,4 @@ insert_data_task = PythonOperator(
 )
 
 tables_base >> [holiday, temperature,
-                coefficient_profil] >> table_models >> insert_data_task
+                coefficient_profil] >> table_models >> insert_data_task >> send_succes_mail
