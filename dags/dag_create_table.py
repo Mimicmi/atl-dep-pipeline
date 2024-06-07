@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
+from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
 from airflow.utils.dates import days_ago
 from datetime import datetime, timedelta
@@ -12,6 +12,7 @@ from airflow.utils.email import send_email
 from email.message import EmailMessage
 import smtplib
 from airflow.decorators import task
+from airflow.operators.dummy import DummyOperator
 
 
 # # Configurer le logger
@@ -333,6 +334,55 @@ default_args = {
 }
 
 
+def check_condition(**kwargs):
+    # Simulate user input or some condition
+    user_input = kwargs['dag_run'].conf.get('effacer_bdd')
+    send_log(user_input)
+    if user_input.lower() == "true":
+        return "effacer_bdd"
+    else:
+        return "false_branch"
+
+
+def task_to_run():
+    postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
+
+    send_log("Début de suppression des tables")
+
+    delete_table_queries = [
+        """
+        TRUNCATE TABLE  holidays_1;
+        """,
+        """
+        TRUNCATE TABLE  temperatures_1;
+        """,
+        """
+        TRUNCATE TABLE  profil_coefficients_1;
+        """,
+        """
+        TRUNCATE TABLE  data_model_inputs_1;
+        """,
+        """
+        DROP TABLE  holidays_1;
+        """,
+        """
+        DROP TABLE  temperatures_1;
+        """,
+        """
+        DROP TABLE  profil_coefficients_1;
+        """,
+        """
+        DROP TABLE  data_model_inputs_1;
+        """
+    ]
+
+    for query in delete_table_queries:
+        postgres_hook.run(query)
+        print(f"Executed query: {query}")
+
+    send_log("Fin de la suppression des tables")
+
+
 @task(task_id="envoi_mail")
 def send_mail(subject, content):
     # Configuration de l'envoi de mail
@@ -360,6 +410,12 @@ dag = DAG(
     'creation_bdd',
     start_date=datetime(2024, 6, 6),
     schedule_interval='0 8 * * *',
+    << << << < HEAD
+    == == == =
+    on_success_callback=dag_success_alert,
+    on_failure_callback=dag_failure_alert,
+    params={"effacer_bdd": "false"},
+    >>>>>> > origin/Shyto
 )
 
 tables_base = PythonOperator(
@@ -392,6 +448,7 @@ coefficient_profil = PythonOperator(
     dag=dag
 )
 
+<< << << < HEAD
 insert_data_task = PythonOperator(
     task_id='insert_transformed_data',
     python_callable=insert_transformed_data,
@@ -401,3 +458,25 @@ insert_data_task = PythonOperator(
 
 tables_base >> [holiday, temperature,
                 coefficient_profil] >> table_models >> insert_data_task >> send_succes_mail
+== == == =
+check_condition_task = BranchPythonOperator(
+    task_id='check_condition',
+    python_callable=check_condition,
+    dag=dag,
+)
+
+true_branch_task = PythonOperator(
+    task_id='effacer_bdd',
+    python_callable=task_to_run,
+    dag=dag,
+)
+
+false_branch_task = DummyOperator(
+    task_id='false_branch',
+    dag=dag,
+)
+
+check_condition_task >> [true_branch_task, false_branch_task]
+true_branch_task >> tables_base >> [
+    holiday, temperature, coefficient_profil] >> table_models
+>>>>>> > origin/Shyto
