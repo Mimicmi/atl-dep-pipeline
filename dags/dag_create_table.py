@@ -50,6 +50,20 @@ def create_table():
             sous_profil VARCHAR(255) ,
             cp FLOAT
         );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS data_model_inputs_1 (
+            timestamp TIMESTAMP,
+            trl FLOAT,
+            tnl FLOAT,
+            sous_profil VARCHAR(255) ,
+            cp FLOAT,
+            day_of_week integer(1),
+            day_of_year integer(2),
+            half_hour integer(2),
+            fr_holiday integer(3),
+            is_public_holiday boolean
+        );
         """
     ]
 
