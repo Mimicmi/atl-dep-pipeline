@@ -20,8 +20,10 @@ logger.setLevel(logging.INFO)
 # # Ajouter le gestionnaire au logger
 # logger.addHandler(console_handler)
 
+
 def send_log(message):
     logger.info(message)
+
 
 def create_table():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
@@ -72,6 +74,7 @@ def create_table():
         print(f"Executed query: {query}")
         send_log("table crée")
     send_log("Fin de la création des tables")
+
 
 # Définiton du dag
 dag = DAG(
