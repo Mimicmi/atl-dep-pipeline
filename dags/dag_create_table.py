@@ -12,8 +12,10 @@ import requests
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
 def send_log(message):
     logger.info(message)
+
 
 def create_table():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
@@ -52,10 +54,10 @@ def create_table():
             tnl FLOAT,
             sous_profil VARCHAR(255) ,
             cp FLOAT,
-            day_of_week integer(1),
-            day_of_year integer(2),
-            half_hour integer(2),
-            fr_holiday integer(3),
+            day_of_week INTEGER,
+            day_of_year INTEGER,
+            half_hour INTEGER,
+            fr_holiday VARCHAR(3),
             is_public_holiday boolean
         );
         """
@@ -67,6 +69,7 @@ def create_table():
         send_log("table crée")
 
     send_log("Fin de la création des tables")
+
 
 def table_models_input():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
@@ -88,24 +91,24 @@ def table_models_input():
         );
         """
     ]
-    
+
     for query in create_table_queries:
         postgres_hook.run(query)
         print(f"Executed query: {query}")
         send_log("table crée")
     send_log("Fin de la création des tables")
 
+
 def insert_holiday():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
-    
-    
+
     d = SchoolHolidayDates()
     france_holidays_2023 = d.holidays_for_year(2023)
     send_log("Récupération des données API vacances ok")
 
     # Convertir le dictionnaire en liste de dictionnaires
     list_holidays = [value for key, value in france_holidays_2023.items()]
-    
+
     # Créer le DataFrame
     send_log("Création du Dataframe vacances")
     df_holidays = pd.DataFrame(list_holidays)
@@ -133,7 +136,6 @@ def insert_holiday():
 def insert_temperature():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
 
-    
     response_temp = requests.get(
         "https://data.enedis.fr//api/explore/v2.1/catalog/datasets/donnees-de-temperature-et-de-pseudo-rayonnement/records")
     send_log("Récupération des données API temperature ok")
@@ -141,7 +143,7 @@ def insert_temperature():
     response_temp = response_temp.json()
 
     records_temp = response_temp["results"]
-    
+
     timestamps_temp = []
     trl = []
     tnl = []
@@ -163,7 +165,7 @@ def insert_temperature():
     cursor = conn.cursor()
     send_log("Connexion à la bdd ok")
 
-    send_log("Debut insertion des données de temperature") 
+    send_log("Debut insertion des données de temperature")
     for index, row in df_temp.iterrows():
         cursor.execute("INSERT INTO temperatures_1 (timestamp, trl, tnl) VALUES (%s,%s,%s)",
                        (row['timestamp'], row['trl'], row['tnl']))
@@ -194,7 +196,7 @@ def insert_coefficient_profile():
         timestamps_profil.append(record["horodate"])
         sous_profil.append(record["sous_profil"])
         cp.append(record["coefficient_ajuste"])
-    
+
     df_profil = pd.DataFrame({
         "timestamp": pd.to_datetime(timestamps_profil),
         "sous_profil": sous_profil,
@@ -204,7 +206,7 @@ def insert_coefficient_profile():
 
     df_profil["sous_profil"] = df_profil["sous_profil"].astype(str)
 
-    send_log("Debut insertion des données de temperature") 
+    send_log("Debut insertion des données de temperature")
     for index, row in df_profil.iterrows():
         cursor.execute("INSERT INTO profil_coefficients_1 (timestamp, sous_profil, cp) VALUES (%s,%s,%s)",
                        (row['timestamp'], row['sous_profil'], row['cp']))
@@ -213,6 +215,7 @@ def insert_coefficient_profile():
     conn.commit()
     cursor.close()
     conn.close()
+
 
 def dag_success_alert(context):
     print(f"DAG has succeeded, run_id: {context['run_id']}")
@@ -260,5 +263,4 @@ coefficient_profil = PythonOperator(
     dag=dag
 )
 
-tables_base>>[holiday, temperature, coefficient_profil]>>table_models
-
+tables_base >> [holiday, temperature, coefficient_profil] >> table_models
