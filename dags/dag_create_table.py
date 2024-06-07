@@ -311,29 +311,6 @@ def insert_coefficient_profile():
     conn.close()
 
 
-def send_success_email():
-    """
-    Fonction pour envoyer un e-mail une fois que le DAG a été exécuté avec succès.
-    """
-    subject = "Succès : Votre DAG a été exécuté avec succès"
-    body = "Bonjour,\n\nVotre DAG a été exécuté avec succès. Bravo !\n\nCordialement,\nVotre équipe Airflow"
-    send_email(to=['jicoga1678@fna6.com'],
-               subject=subject, html_content=body)
-
-
-default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'schedule_interval': 'None',
-    'start_date': datetime(2024, 3, 17),
-    'email_on_failure': False,
-    'email_on_success': True,
-    'email_on_retry': False,
-    'email_on_retry': False,
-    'retries': 1
-}
-
-
 def check_condition(**kwargs):
     # Simulate user input or some condition
     user_input = kwargs['dag_run'].conf.get('effacer_bdd')
@@ -410,12 +387,7 @@ dag = DAG(
     'creation_bdd',
     start_date=datetime(2024, 6, 6),
     schedule_interval='0 8 * * *',
-    << << << < HEAD
-    == == == =
-    on_success_callback=dag_success_alert,
-    on_failure_callback=dag_failure_alert,
     params={"effacer_bdd": "false"},
-    >>>>>> > origin/Shyto
 )
 
 tables_base = PythonOperator(
@@ -448,17 +420,12 @@ coefficient_profil = PythonOperator(
     dag=dag
 )
 
-<< << << < HEAD
 insert_data_task = PythonOperator(
     task_id='insert_transformed_data',
     python_callable=insert_transformed_data,
     dag=dag,
 )
 
-
-tables_base >> [holiday, temperature,
-                coefficient_profil] >> table_models >> insert_data_task >> send_succes_mail
-== == == =
 check_condition_task = BranchPythonOperator(
     task_id='check_condition',
     python_callable=check_condition,
@@ -478,5 +445,4 @@ false_branch_task = DummyOperator(
 
 check_condition_task >> [true_branch_task, false_branch_task]
 true_branch_task >> tables_base >> [
-    holiday, temperature, coefficient_profil] >> table_models
->>>>>> > origin/Shyto
+    holiday, temperature, coefficient_profil] >> insert_data_task >> table_models >> send_succes_mail
