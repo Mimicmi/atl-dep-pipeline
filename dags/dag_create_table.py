@@ -99,6 +99,61 @@ def table_models_input():
     send_log("Fin de la création des tables")
 
 
+def insert_transformed_data():
+    postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
+
+    join_query = """
+    WITH rounded_temps AS (
+    SELECT
+        timestamp,
+        trl,
+        tnl,
+        DATE_TRUNC('minute', timestamp) AS rounded_timestamp
+    FROM
+        temperatures_1
+    ),
+    rounded_profil AS (
+        SELECT
+            timestamp,
+            sous_profil,
+            cp,
+            DATE_TRUNC('minute', timestamp) AS rounded_timestamp
+        FROM
+            profil_coefficients_1
+    )
+    SELECT
+        t.timestamp,
+        t.trl,
+        t.tnl,
+        COALESCE(p.sous_profil, '') AS sous_profil,
+        COALESCE(p.cp, 0) AS cp,
+        EXTRACT(ISODOW FROM t.timestamp) - 1 AS day_of_week,
+        EXTRACT(MONTH FROM t.timestamp) AS month,
+        (EXTRACT(HOUR FROM t.timestamp) * 2 + EXTRACT(MINUTE FROM t.timestamp) / 30 + 1) AS half_hour,
+        CONCAT(
+            CASE WHEN h.vacances_zone_a THEN '1' ELSE '0' END,
+            CASE WHEN h.vacances_zone_b THEN '1' ELSE '0' END,
+            CASE WHEN h.vacances_zone_c THEN '1' ELSE '0' END
+        ) AS fr_holiday,
+        h.is_public_holiday
+    FROM
+        rounded_temps t
+    LEFT JOIN
+        rounded_profil p ON t.rounded_timestamp = p.rounded_timestamp AND t.timestamp = p.timestamp
+    LEFT JOIN
+        holidays_1 h ON t.timestamp::DATE = h.date::DATE;
+    """
+
+    # Insert data into data_model_inputs_1
+    insert_query = f"""
+    INSERT INTO data_model_inputs_1 (timestamp, trl, tnl, sous_profil, cp, day_of_week, day_of_year, half_hour, fr_holiday, is_public_holiday)
+    {join_query};
+    """
+
+    postgres_hook.run(insert_query)
+    print("Data inserted into data_model_inputs_1.")
+
+
 def insert_holiday():
     postgres_hook = PostgresHook(postgres_conn_id="POSTGRES_CONNEXION")
 
@@ -229,7 +284,7 @@ def dag_failure_alert():
 dag = DAG(
     'creation_bdd',
     start_date=datetime(2024, 6, 6),
-    schedule_interval='@daily',
+    schedule_interval='0 8 * * *',
     default_args={
         'on_success_callback': dag_success_alert,
         'on_failure_callback': dag_failure_alert
@@ -266,4 +321,11 @@ coefficient_profil = PythonOperator(
     dag=dag
 )
 
-tables_base >> [holiday, temperature, coefficient_profil] >> table_models
+insert_data_task = PythonOperator(
+    task_id='insert_transformed_data',
+    python_callable=insert_transformed_data,
+    dag=dag,
+)
+
+tables_base >> [holiday, temperature,
+                coefficient_profil] >> table_models >> insert_data_task
